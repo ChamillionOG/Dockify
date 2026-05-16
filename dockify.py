@@ -1,11 +1,11 @@
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel
-from PyQt5.QtGui import QIcon, QFontDatabase, QPixmap
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QIcon, QFontDatabase
+from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QRect, QEasingCurve
 
 
 class HoverIconButton(QPushButton):
-    def __init__(self, normal_path, hover_path, size, parent=None):
-        super().__init__(parent)
+    def __init__(self, normal_path, hover_path, size):
+        super().__init__()
         self.normal_icon = QIcon(normal_path)
         self.hover_icon = QIcon(hover_path)
 
@@ -66,13 +66,17 @@ class DockifyUI(QWidget):
 
     def setup_window(self):
         self.setWindowTitle("Dockify")
-        self.setFixedSize(350, 90)
+        self.resize(350, 90)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
     def setup_ui(self):
         self.container = QWidget(self)
         self.container.setObjectName("container")
+
+        self.window_anim = QPropertyAnimation(self, b"geometry")
+        self.window_anim.setDuration(500)
+        self.window_anim.setEasingCurve(QEasingCurve.OutBack)
 
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -118,6 +122,9 @@ class DockifyUI(QWidget):
         button_layout.addWidget(self.next_button)
         button_layout.addWidget(self.repeat_button)
 
+        self.previous_button.clicked.connect(self.expand_ui)
+        self.next_button.clicked.connect(self.collapse_ui)
+
         text_layout = QVBoxLayout()
 
         self.song_label = QLabel("Song Name Here")
@@ -127,6 +134,28 @@ class DockifyUI(QWidget):
         container_layout.addLayout(text_layout)
         container_layout.addLayout(button_layout)
         self.container.setLayout(container_layout)
+
+    def animate_window(self, target_width, target_height):
+        start_rect = self.geometry()
+
+        center_x = start_rect.x() + start_rect.width() // 2
+        bottom_y = start_rect.y() + start_rect.height()
+
+        end_x = int(center_x - target_width // 2)
+        end_y = bottom_y - target_height
+
+        end_rect = QRect(end_x, end_y, target_width, target_height)
+
+        self.window_anim.stop()
+        self.window_anim.setStartValue(start_rect)
+        self.window_anim.setEndValue(end_rect)
+        self.window_anim.start()
+
+    def expand_ui(self):
+        self.animate_window(325, 350)
+
+    def collapse_ui(self):
+        self.animate_window(350, 90)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
