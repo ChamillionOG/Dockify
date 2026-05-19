@@ -1,17 +1,20 @@
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel
-from PyQt5.QtGui import QIcon, QFontDatabase
+from PyQt5.QtWidgets import (
+    QWidget, QHBoxLayout, QVBoxLayout, QPushButton,
+    QLabel, QSizePolicy
+)
+from PyQt5.QtGui import QIcon, QFontDatabase, QPixmap
 from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QRect, QEasingCurve
 
 
 class HoverIconButton(QPushButton):
-    def __init__(self, normal_path, hover_path, size):
+    def __init__(self, normal_path, hover_path, width, height):
         super().__init__()
         self.normal_icon = QIcon(normal_path)
         self.hover_icon = QIcon(hover_path)
 
         self.setIcon(self.normal_icon)
-        self.setIconSize(QSize(size, size))
-        self.setFixedSize(size + 10, size + 10)
+        self.setIconSize(QSize(width, height))
+        self.setFixedSize(width + 10, height + 10)
         self.setCursor(Qt.PointingHandCursor)
 
     def enterEvent(self, event):
@@ -28,13 +31,14 @@ class DockifyUI(QWidget):
         super().__init__()
 
         self.dragging = False
+        self.expanded = False
         self.offset = None
 
         font_id = QFontDatabase.addApplicationFont("assets/default_font.ttf")
-        if font_id != -1:
-            self.font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
-        else:
-            self.font_family = "Arial"
+        self.font_family = (
+            QFontDatabase.applicationFontFamilies(font_id)[0]
+            if font_id != -1 else "Arial"
+        )
 
         self.setup_window()
         self.setup_ui()
@@ -48,6 +52,12 @@ class DockifyUI(QWidget):
                 border-radius: 25px;
             }}
 
+            QWidget#title_bar {{
+                background-color: rgba(30, 30, 30, 255);
+                border-top-left-radius: 25px;
+                border-top-right-radius: 25px;
+            }}
+
             QPushButton {{
                 background-color: rgba(42, 42, 42, 255);
                 border: none;
@@ -57,10 +67,14 @@ class DockifyUI(QWidget):
 
             QLabel {{
                 font-family: "{self.font_family}";
-                background-color: transparent;
+                background: transparent;
                 font-weight: bold;
                 font-size: 15px;
                 color: white;
+            }}
+
+            QLabel#app_name {{
+                font-size: 15px;
             }}
         """)
 
@@ -82,39 +96,44 @@ class DockifyUI(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(self.container)
 
-        container_layout = QVBoxLayout()
-        container_layout.setContentsMargins(75, 10, 75, 10)
-        container_layout.setSpacing(5)
+        self.container_layout = QVBoxLayout()
+        self.container_layout.setContentsMargins(2, 2, 2, 2)
+        self.container_layout.setSpacing(0)
+
+        self.container.setLayout(self.container_layout)
+
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(75, 10, 75, 10)
+        self.content_layout.setSpacing(5)
 
         button_layout = QHBoxLayout()
 
         self.shuffle_button = HoverIconButton(
             "assets/shuffle_button_icon.png",
             "assets/shuffle_button_icon_hover.png",
-            20
+            20, 20
         )
         self.previous_button = HoverIconButton(
             "assets/previous_button_icon.png",
             "assets/previous_button_icon_hover.png",
-            20
+            20, 20
         )
         self.play_button = HoverIconButton(
             "assets/play_button_icon.png",
             "assets/play_button_icon_hover.png",
-            20
+            25, 25
         )
         self.next_button = HoverIconButton(
             "assets/next_button_icon.png",
             "assets/next_button_icon_hover.png",
-            20
+            20, 20
         )
         self.repeat_button = HoverIconButton(
             "assets/repeat_button_icon.png",
             "assets/repeat_button_icon_hover.png",
-            20
+            20, 20
         )
-
-        self.play_button.setFixedSize(35, 35)
 
         button_layout.addWidget(self.shuffle_button)
         button_layout.addWidget(self.previous_button)
@@ -125,15 +144,38 @@ class DockifyUI(QWidget):
         self.previous_button.clicked.connect(self.expand_ui)
         self.next_button.clicked.connect(self.collapse_ui)
 
-        text_layout = QVBoxLayout()
-
         self.song_label = QLabel("Song Name Here")
         self.song_label.setAlignment(Qt.AlignCenter)
-        text_layout.addWidget(self.song_label)
 
-        container_layout.addLayout(text_layout)
-        container_layout.addLayout(button_layout)
-        self.container.setLayout(container_layout)
+        self.content_layout.addWidget(self.song_label)
+        self.content_layout.addLayout(button_layout)
+
+        self.container_layout.addWidget(self.content_widget)
+
+        self.create_title_bar()
+
+    def create_title_bar(self):
+        self.title_bar = QWidget()
+        self.title_bar.setObjectName("title_bar")
+        self.title_bar.setFixedHeight(35)
+        self.title_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        title_layout = QHBoxLayout(self.title_bar)
+        title_layout.setContentsMargins(20, 0, 20, 0)
+
+        self.app_icon = QLabel()
+        self.app_icon.setPixmap(QPixmap("assets/temp_icon.png").scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.app_icon.setFixedSize(20, 20)
+
+        self.app_name = QLabel("Dockify")
+        self.app_name.setObjectName("app_name")
+
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        title_layout.addWidget(self.app_icon)
+        title_layout.addWidget(self.app_name)
+        title_layout.addWidget(spacer)
 
     def animate_window(self, target_width, target_height):
         start_rect = self.geometry()
@@ -152,10 +194,19 @@ class DockifyUI(QWidget):
         self.window_anim.start()
 
     def expand_ui(self):
-        self.animate_window(325, 350)
+        if not self.expanded:
+            self.container_layout.insertWidget(0, self.title_bar)
+
+        self.title_bar.show()
+
+        self.animate_window(325, 400)
+        self.expanded = True
 
     def collapse_ui(self):
+        self.title_bar.hide()
+
         self.animate_window(350, 90)
+        self.expanded = False
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
